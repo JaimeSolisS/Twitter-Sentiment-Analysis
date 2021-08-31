@@ -1,11 +1,11 @@
 import streamlit as st
 from multiapp import MultiApp
 from pages import home, user, search # import your app modules here
-from PIL import Image 
-
-app = MultiApp()
 
 st.set_page_config(layout="wide")
+
+
+app = MultiApp()
 
 # Simple grid for gif
 col_1, col_2, col_3 = st.columns([2,1,2])
