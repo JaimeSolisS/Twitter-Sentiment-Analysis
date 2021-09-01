@@ -10,12 +10,19 @@ from textblob import TextBlob
 import plotly.express as px
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
+from matplotlib.colors import ListedColormap,LinearSegmentedColormap
+import numpy as np
+from PIL import Image
 
 # Set Colors 
 blue = "#1DA1F2"
 black = "#14171A"
 dark_gray = "#657786"
 light_gray = "#AAB8C2"
+
+#Modify Colormap
+color_map = plt.cm.get_cmap('Blues', 256).reversed()
+new_color_map = ListedColormap(color_map(np.linspace(0, .7, 256)))
 
 def auth(): 
     load_dotenv()
@@ -109,9 +116,8 @@ def sentimentPie(df):
                 hole=.4, 
                 )
     fig.update_traces(textposition='inside', textinfo='percent+label')
-    fig.update(layout_title_text='Tweets Classification by Sentiment',
-            layout_showlegend=False)
-    st.plotly_chart(fig)
+    fig.update(layout_showlegend=False)
+    st.plotly_chart(fig, use_container_width=True)
 
 def typePie(df):
     df1 = df.groupby('Type').count()[['Tweet']].reset_index()
@@ -127,9 +133,8 @@ def typePie(df):
                 hole=.4, 
                 )
     fig.update_traces(textposition='inside', textinfo='percent+label')
-    fig.update(layout_title_text='Tweets Classification by Type',
-           layout_showlegend=False)
-    st.plotly_chart(fig)
+    fig.update(layout_showlegend=False)
+    st.plotly_chart(fig, use_container_width=True)
 
 def sentimentScatter(df): 
     #Since plotly reads in html including tags, \n and the break tag <br> can be inserted into the text for the df variable you want to have wrap when displayed:
@@ -146,18 +151,37 @@ def sentimentScatter(df):
                 },)
 
     fig.update_layout(template='plotly_white')
-    fig.update(layout_title_text='Sentiment Analysis')
-    st.plotly_chart(fig)
+    #fig.update(layout_title_text='Sentiment Analysis')
+    st.plotly_chart(fig, use_container_width=True)
 
-def makeWordCloud(df):
+def generateWordCloud(df):
     # word cloud visualization
     allWords = ' '.join([twts for twts in df['clean_Tweet']])
-    wordCloud = WordCloud(width=500, height=300, random_state=21, background_color="white", max_words=100).generate(allWords)
+    wordCloud = WordCloud(width=500, height=300, random_state=21, background_color="white", max_words=100, colormap=new_color_map).generate(allWords)
     fig, ax = plt.subplots()
     ax.imshow(wordCloud, interpolation="bilinear")
     ax.axis('off')
-    ax.set_title('Most frequent words found')
-    st.pyplot(fig)
+    #ax.set_title('Most frequent words found')
+    st.pyplot(fig, use_container_width=True)
+
+def getMask():
+    return np.array(Image.open('img/twitter_mask.png'))
+
+def generate_better_wordcloud(df, title, mask=None):
+    allWords = ' '.join([twts for twts in df['clean_Tweet']])
+    cloud = WordCloud(scale=3,
+                        max_words=500,
+                        colormap=new_color_map,
+                        mask=mask,
+                        background_color='white',
+                        collocations=True).generate_from_text(allWords)
+
+    fig, ax = plt.subplots()                   
+    ax.imshow(cloud, interpolation="bilinear")
+    ax.axis('off')
+    ax.set_title(title)
+    st.pyplot(fig, use_container_width=True)
+    
 
 def app():
     api = auth()
@@ -195,18 +219,21 @@ def app():
                 df = createDF(posts)    
                 col1, col2 = st.columns([1,1])
                 with col1:
+                    st.subheader("Tweets Classification by Sentiment")
                     sentimentPie(df)
+                    st.subheader("Sentiment Analysis")
                     sentimentScatter(df)
                 with col2:
+                    st.subheader("Tweets Classification by Type")
                     typePie(df)
-                    makeWordCloud(df)
+                    st.subheader("Most frequent Words")
+                    generate_better_wordcloud(df, "", mask=getMask())
                 
-
             
                 
 
         except:
-            st.error("Please, specify a username")
+            st.error()
     else:
         st.write('In this page, we will be analyze tweets from a specific user.')
         st.write('User timelines belonging to protected users may only be requested when the authenticated user either "owns" the timeline or is an approved follower of the owner.')
