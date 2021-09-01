@@ -13,6 +13,8 @@ from wordcloud import WordCloud
 from matplotlib.colors import ListedColormap,LinearSegmentedColormap
 import numpy as np
 from PIL import Image
+import requests
+import streamlit.components.v1 as components
 
 # Set Colors 
 blue = "#1DA1F2"
@@ -87,8 +89,9 @@ def getAnalysis(score):
 
 def createDF(posts): 
     # Create a dataframe with a column called Tweets
-    df = pd.DataFrame([tweet.full_text for tweet in posts], columns=['Tweets'])
     df = pd.DataFrame([tweet.full_text for tweet in posts], columns=['Tweet'])
+    df['id'] = pd.DataFrame([tweet.id for tweet in posts])
+    df['screen_name'] = pd.DataFrame([tweet.user.screen_name for tweet in posts])
     df['is_reply'] = pd.DataFrame([tweet.in_reply_to_screen_name for tweet in posts])
     df['is_retweeted'] = df.apply(rt, axis=1)
     df['is_quote'] = pd.DataFrame([tweet.is_quote_status for tweet in posts])
@@ -182,6 +185,44 @@ def generate_better_wordcloud(df, title, mask=None):
     ax.set_title(title)
     st.pyplot(fig, use_container_width=True)
     
+class Tweet(object):
+    def __init__(self, s, embed_str=False):
+        if not embed_str:
+            # Use Twitter's oEmbed API
+            # https://dev.twitter.com/web/embedded-tweets
+            api = "https://publish.twitter.com/oembed?url={}".format(s)
+            response = requests.get(api)
+            self.text = response.json()["html"]
+        else:
+            self.text = s
+
+    def _repr_html_(self):
+        return self.text
+
+    def component(self):
+        return components.html(self.text, height=600)
+
+def show_tweets(df, analysis, sort):
+    newDF = df[df.Analysis == analysis]
+    newDF = newDF.sort_values(by=['Polarity'], ascending=sort) #Sort the tweets
+    # Implment this in order to avoid errors
+    finished = False
+    count = 0
+    index = 0
+    while not finished:
+        try:
+            t = Tweet(f"https://twitter.com/{newDF['screen_name'][index]}/status/{newDF['id'][index]}").component()
+            index +=1
+            count += 1
+        except:
+            index +=1
+        finished = evaluate_end_condition(count)
+
+def evaluate_end_condition(count):
+    if count == 5:
+        return True
+    else:
+         return False
 
 def app():
     api = auth()
@@ -223,11 +264,21 @@ def app():
                     sentimentPie(df)
                     st.subheader("Sentiment Analysis")
                     sentimentScatter(df)
+                    
                 with col2:
                     st.subheader("Tweets Classification by Type")
                     typePie(df)
                     st.subheader("Most frequent Words")
                     generate_better_wordcloud(df, "", mask=getMask())
+
+                col1, col2 = st.columns([1,1])
+                with col1:
+                    st.subheader("Some Positive tweets")
+                    show_tweets(df, "Positive", False)
+                with col2:
+                    st.subheader("Some Negative tweets")
+                    show_tweets(df, "Negative", True)
+                
                 
             
                 
