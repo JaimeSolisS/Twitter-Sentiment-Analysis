@@ -1,9 +1,21 @@
+from numpy.core import machar
 import streamlit as st
 from tensorflow.python.ops.gen_array_ops import empty
 import tweepy
 import os
 from dotenv import load_dotenv
 import pandas as pd
+import re
+from textblob import TextBlob 
+import plotly.express as px
+import matplotlib.pyplot as plt
+from wordcloud import WordCloud
+
+# Set Colors 
+blue = "#1DA1F2"
+black = "#14171A"
+dark_gray = "#657786"
+light_gray = "#AAB8C2"
 
 def auth(): 
     load_dotenv()
@@ -16,6 +28,136 @@ def auth():
     authenticate = tweepy.OAuthHandler(apiKey, apiSecretKey)
     authenticate.set_access_token(accessToken, AccessTokenSecret )
     return tweepy.API(authenticate)
+
+# Create Function to identify Organic Tweets
+def organic(df):
+    if (df['is_reply'] is None) and (df['is_retweeted'] is False) and (df['is_quote'] is False):
+        return True
+    else: 
+        return False
+# Create Function to identify Reeweets
+def rt(df):
+    if (df['Tweet'][0:2] == "RT") :
+        return True
+    else: 
+        return False  
+
+# Create Function to clasify tweets based on the rest of columns 
+def tweetype(df):
+    if (df['is_reply'] != None):
+        return 'Reply'
+    elif (df['is_retweeted'] is True):
+        return 'Retweet'
+    elif (df['is_quote'] is True):
+        return 'Quote'
+    else:
+        return 'Organic'
+
+# Create a function to clean the tweets
+def cleanTxt(text):
+    text = re.sub('@[A-Za-z0–9]+', '', text) #Removing @mentions
+    text = re.sub('#', '', text) # Removing '#' hash tag
+    text = re.sub('RT[\s]+', '', text) # Removing RT
+    text = re.sub('https?:\/\/\S+', '', text) # Removing hyperlink
+    return text
+
+# Create a function to get the subjectivity
+def getSubjectivity(text):
+    return TextBlob(text).sentiment.subjectivity
+
+# Create a function to get the polarity
+def getPolarity(text):
+    return  TextBlob(text).sentiment.polarity
+
+# Create a function to compute negative (-1), neutral (0) and positive (+1) analysis
+def getAnalysis(score):
+    if score < 0:
+        return 'Negative'
+    elif score == 0:
+        return 'Neutral'
+    else:
+        return 'Positive'
+
+def createDF(posts): 
+    # Create a dataframe with a column called Tweets
+    df = pd.DataFrame([tweet.full_text for tweet in posts], columns=['Tweets'])
+    df = pd.DataFrame([tweet.full_text for tweet in posts], columns=['Tweet'])
+    df['is_reply'] = pd.DataFrame([tweet.in_reply_to_screen_name for tweet in posts])
+    df['is_retweeted'] = df.apply(rt, axis=1)
+    df['is_quote'] = pd.DataFrame([tweet.is_quote_status for tweet in posts])
+    df['is_organic'] = df.apply(organic, axis=1)
+    df['Type'] =df.apply(tweetype, axis=1)
+
+    # Clean the tweets
+    df['clean_Tweet'] = df['Tweet'].apply(cleanTxt)
+    # Create two new columns 'Subjectivity' & 'Polarity'
+    df['Subjectivity'] = df['clean_Tweet'].apply(getSubjectivity)
+    df['Polarity'] = df['clean_Tweet'].apply(getPolarity)
+
+    df['Analysis'] = df['Polarity'].apply(getAnalysis)
+    return df
+
+def sentimentPie(df):
+    df1 = df.groupby('Analysis').count()[['Tweet']].reset_index()
+    fig = px.pie(df1, 
+                values='Tweet', 
+                names='Analysis', 
+                color='Analysis', 
+                color_discrete_map={'Positive': blue,
+                                    'Negative': black,
+                                    'Neutral': dark_gray}, 
+                hole=.4, 
+                )
+    fig.update_traces(textposition='inside', textinfo='percent+label')
+    fig.update(layout_title_text='Tweets Classification by Sentiment',
+            layout_showlegend=False)
+    st.plotly_chart(fig)
+
+def typePie(df):
+    df1 = df.groupby('Type').count()[['Tweet']].reset_index()
+
+    fig = px.pie(df1, 
+                values='Tweet', 
+                names='Type', 
+                color='Type', 
+                color_discrete_map={'Organic': blue,
+                                    'Retweet': black,
+                                    'Quote': dark_gray,
+                                    'Reply': light_gray }, 
+                hole=.4, 
+                )
+    fig.update_traces(textposition='inside', textinfo='percent+label')
+    fig.update(layout_title_text='Tweets Classification by Type',
+           layout_showlegend=False)
+    st.plotly_chart(fig)
+
+def sentimentScatter(df): 
+    #Since plotly reads in html including tags, \n and the break tag <br> can be inserted into the text for the df variable you want to have wrap when displayed:
+    df.Tweet = df.Tweet.str.wrap(60)
+    df.Tweet = df.Tweet.apply(lambda x: x.replace('\n', '<br>'))
+    fig = px.scatter(df, x="Polarity", y="Subjectivity", 
+                 color="Type",
+                 hover_data=['Tweet'],
+                color_discrete_map={
+                "Organic": blue,
+                "Retweet": black,
+                "Quote": dark_gray,
+                "Reply": light_gray,
+                },)
+
+    fig.update_layout(template='plotly_white')
+    fig.update(layout_title_text='Sentiment Analysis')
+    st.plotly_chart(fig)
+
+def makeWordCloud(df):
+    # word cloud visualization
+    allWords = ' '.join([twts for twts in df['clean_Tweet']])
+    wordCloud = WordCloud(width=500, height=300, random_state=21, background_color="white", max_words=100).generate(allWords)
+    fig, ax = plt.subplots()
+    ax.imshow(wordCloud, interpolation="bilinear")
+    ax.axis('off')
+    ax.set_title('Most frequent words found')
+    st.pyplot(fig)
 
 def app():
     api = auth()
@@ -49,10 +191,19 @@ def app():
                     posts.append(items)
                 # For 200 tweets or less
                 #posts = api.user_timeline(screen_name=username, count = count, exclude_replies=replies, include_rts=rts, tweet_mode="extended")
-                # Create a dataframe with a column called Tweets
-                df = pd.DataFrame([tweet.full_text for tweet in posts], columns=['Tweets'])
-               
-                st.dataframe(df)
+
+                df = createDF(posts)    
+                col1, col2 = st.columns([1,1])
+                with col1:
+                    sentimentPie(df)
+                    sentimentScatter(df)
+                with col2:
+                    typePie(df)
+                    makeWordCloud(df)
+                
+
+            
+                
 
         except:
             st.error("Please, specify a username")
