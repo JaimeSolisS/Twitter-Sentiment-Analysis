@@ -15,6 +15,7 @@ import numpy as np
 from PIL import Image
 import requests
 import streamlit.components.v1 as components
+from deep_translator import GoogleTranslator
 
 # Set Colors 
 blue = "#1DA1F2"
@@ -64,11 +65,11 @@ def tweetype(df):
 
 # Create a function to clean the tweets
 def cleanTxt(text):
-    text = re.sub('@[A-Za-z0–9]+', '', text) #Removing @mentions
+    text = re.sub('@[A-Za-z0–9_]+', '', text) #Removing @mentions
     text = re.sub('#', '', text) # Removing '#' hash tag
     text = re.sub('RT[\s]+', '', text) # Removing RT
     text = re.sub('https?:\/\/\S+', '', text) # Removing hyperlink
-    return text
+    return text 
 
 # Create a function to get the subjectivity
 def getSubjectivity(text):
@@ -87,9 +88,27 @@ def getAnalysis(score):
     else:
         return 'Positive'
 
+# Create a function to translate
+def translateTweet(text):
+    return GoogleTranslator(source='auto', target='en').translate(text)
+
+# Create function to store translated tweets in a DataFrame
+def translateTweets(tweets): 
+    translated_tweets =[]
+    for tweet in tweets:
+        translated_tweets.append(translateTweet((tweet.full_text)))
+    df = pd.DataFrame(translated_tweets)
+    df['Tweets_Translated'] = pd.Series(df.fillna('').values.tolist()).str.join('')
+    df.drop(df.columns.difference(['Tweets_Translated']), 1, inplace=True)
+    return df
+
+st.cache
 def createDF(posts): 
     # Create a dataframe with a column called Tweets
     df = pd.DataFrame([tweet.full_text for tweet in posts], columns=['Tweet'])
+    df['Tweets_Translated'] = translateTweets(posts)
+    # Replace some NaN values, don't know why
+    #df.Tweets_Translated.fillna(df.Tweet, inplace=True)
     df['id'] = pd.DataFrame([tweet.id for tweet in posts])
     df['screen_name'] = pd.DataFrame([tweet.user.screen_name for tweet in posts])
     df['is_reply'] = pd.DataFrame([tweet.in_reply_to_screen_name for tweet in posts])
@@ -99,12 +118,15 @@ def createDF(posts):
     df['Type'] =df.apply(tweetype, axis=1)
 
     # Clean the tweets
-    df['clean_Tweet'] = df['Tweet'].apply(cleanTxt)
+    df['clean_Tweet'] = df['Tweets_Translated'].apply(cleanTxt)
+    df['clean_Tweet_original'] = df['Tweet'].apply(cleanTxt)
+    #df['Tweets_Translated'] = df['Tweets_Translated'].apply(cleanTxt)
     # Create two new columns 'Subjectivity' & 'Polarity'
     df['Subjectivity'] = df['clean_Tweet'].apply(getSubjectivity)
     df['Polarity'] = df['clean_Tweet'].apply(getPolarity)
 
     df['Analysis'] = df['Polarity'].apply(getAnalysis)
+    
     return df
 
 def sentimentPie(df):
@@ -159,7 +181,7 @@ def sentimentScatter(df):
 
 def generateWordCloud(df):
     # word cloud visualization
-    allWords = ' '.join([twts for twts in df['clean_Tweet']])
+    allWords = ' '.join([twts for twts in df['clean_Tweet_original']])
     wordCloud = WordCloud(width=500, height=300, random_state=21, background_color="white", max_words=100, colormap=new_color_map).generate(allWords)
     fig, ax = plt.subplots()
     ax.imshow(wordCloud, interpolation="bilinear")
@@ -171,7 +193,7 @@ def getMask():
     return np.array(Image.open('img/twitter_mask.png'))
 
 def generate_better_wordcloud(df, title, mask=None):
-    allWords = ' '.join([twts for twts in df['clean_Tweet']])
+    allWords = ' '.join([twts for twts in df['clean_Tweet_original']])
     cloud = WordCloud(scale=3,
                         max_words=500,
                         colormap=new_color_map,
@@ -257,7 +279,10 @@ def app():
                 # For 200 tweets or less
                 #posts = api.user_timeline(screen_name=username, count = count, exclude_replies=replies, include_rts=rts, tweet_mode="extended")
 
-                df = createDF(posts)    
+                df = createDF(posts)  
+                st.dataframe(df)
+
+                
                 col1, col2 = st.columns([1,1])
                 with col1:
                     st.subheader("Tweets Classification by Sentiment")
@@ -276,8 +301,8 @@ def app():
                     st.subheader("Some Positive tweets")
                     show_tweets(df, "Positive", False)
                 with col2:
-                    st.subheader("Some Negative tweets")
-                    show_tweets(df, "Negative", True)
+                   st.subheader("Some Negative tweets")
+                   show_tweets(df, "Negative", True)
                 
                 
             
