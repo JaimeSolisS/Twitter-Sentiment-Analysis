@@ -354,21 +354,25 @@ def evaluate_end_condition(count):
     else:
          return False
 
-
-          
-
-
 def app():
     api = auth()
-
+   
     st.sidebar.header('Specify Parameters')
     full_username = st.sidebar.text_input("Username (with @)")
     error_slot = st.sidebar.empty() 
-    count = st.sidebar.slider('# of tweets', 10,3200,100)
+    count = st.sidebar.slider('# of tweets', 100,3200,100)
+    count_slot = st.sidebar.empty()
+    if count > 2000:
+        count_slot.warning("This amount of tweets may take more than a mintue to process.")
+    else: 
+        count_slot.empty()
     replies = st.sidebar.selectbox("Include replies", ("false", "true")) #you will receive up-to count tweets — this is because the count parameter retrieves that many Tweets before filtering out retweets and replies.
     rts = st.sidebar.selectbox("Include RTs", ("false", "true")) #When set to false , the timeline will strip any native retweets (though they will still count toward both the maximal length of the timeline and the slice selected by the count parameter).
-    st.sidebar.write("")
-    translate = st.sidebar.selectbox("Translate tweets", ("false", "true"))
+    translate_slot = st.sidebar.empty()
+    if (count < 300):
+        translate = st.sidebar.selectbox("Translate tweets", ("false", "true"))
+    else: 
+        translate = "false"
   
     submit = st.sidebar.button("Submit") 
 
@@ -384,11 +388,11 @@ def app():
     slot4 = st.empty()
     slot5 = st.empty()
 
-    slot1.write('In this page, we will be analyze tweets from a specific user.')
-    slot2.write('User timelines belonging to protected users may only be requested when the authenticated user either "owns" the timeline or is an approved follower of the owner.')
+    slot1.write('In this page, we will analyze tweets from a specific user.')
+    slot2.write('Requesting tweets from protected users or non-existent users will result in an error.')
     slot3.write("This method can only return up to 3,200 of a user's most recent Tweets. Native retweets of other statuses by the user is included in this total, regardless of whether `Include RTs` is set to false when requesting this resource.")
     slot4.write('Using `Include replies` and `Include RTs` set to *false* with will mean you will receive up-to _# of tweets_ tweets — this is because the count parameter retrieves that many Tweets before filtering out retweets and replies.')
-    slot5.write('Use `Translate Tweets` set to true **ONLY** if you want to analyze users who tweet in another language. Translating tweets may take a little more time, sorry about that:(')
+    slot5.write('Use `Translate Tweets` set to true **ONLY** if you want to analyze users who tweet in another language other than english. It is only possible to translate up to 300 tweets for now')
 
     if submit: 
         try:
@@ -433,7 +437,7 @@ def app():
                         st.subheader("Some Negative tweets")
                         show_tweets(df, "Negative", True)
                 except:
-                    st.error("Something went wrong 😞, maybe the tweets are protected or the user doesn't exist.")
+                    st.error("Something went wrong 😞")
         except:
             st.error("Something went wrong 😞")
         
