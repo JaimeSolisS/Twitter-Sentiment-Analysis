@@ -29,6 +29,7 @@ light_gray = "#AAB8C2"
 color_map = plt.cm.get_cmap('Blues', 256).reversed()
 new_color_map = ListedColormap(color_map(np.linspace(0, .7, 256)))
 
+st.cache
 def auth(): 
     load_dotenv()
     apiKey = os.getenv('CONSUMER_KEY')
@@ -42,12 +43,14 @@ def auth():
     return tweepy.API(authenticate)
 
 # Create Function to identify Organic Tweets
+st.cache
 def organic(df):
     if (df['is_reply'] is None) and (df['is_retweeted'] is False) and (df['is_quote'] is False):
         return True
     else: 
         return False
 # Create Function to identify Reeweets
+st.cache
 def rt(df):
     if (df['Tweet'][0:2] == "RT") :
         return True
@@ -55,6 +58,7 @@ def rt(df):
         return False  
 
 # Create Function to clasify tweets based on the rest of columns 
+st.cache
 def tweetype(df):
     if (df['is_reply'] != None):
         return 'Reply'
@@ -66,6 +70,7 @@ def tweetype(df):
         return 'Organic'
 
 # Create a function to clean the tweets
+st.cache
 def cleanTxt(text):
     text = re.sub('@[A-Za-z0–9_]+', '', text) #Removing @mentions
     text = re.sub('#', '', text) # Removing '#' hash tag
@@ -74,14 +79,17 @@ def cleanTxt(text):
     return text 
 
 # Create a function to get the subjectivity
+st.cache
 def getSubjectivity(text):
     return TextBlob(text).sentiment.subjectivity
 
 # Create a function to get the polarity
+st.cache
 def getPolarity(text):
     return  TextBlob(text).sentiment.polarity
 
 # Create a function to compute negative (-1), neutral (0) and positive (+1) analysis
+st.cache
 def getAnalysis(score):
     if score < 0:
         return 'Negative'
@@ -91,10 +99,12 @@ def getAnalysis(score):
         return 'Positive'
 
 # Create a function to translate
+st.cache
 def translateTweet(text):
     return GoogleTranslator(source='auto', target='en').translate(text)
 
 # Create function to store translated tweets in a DataFrame
+st.cache
 def translateTweets(tweets): 
     translated_tweets =[]
     
@@ -143,7 +153,7 @@ def getData(api, posts, username, replies, rts, count):
     return  
     
 st.cache
-def createDF(posts): 
+def createDF(posts, translate): 
     bar = st.empty()
     bar.progress(0)
     # Create a dataframe with a column called Tweets
@@ -151,10 +161,12 @@ def createDF(posts):
     for percent_complete in range(7):
         bar.progress(percent_complete + 1)
         time.sleep(0.1)
-    df['Tweets_Translated'] = translateTweets(posts)
-    for percent_complete in range(7,14):
-        bar.progress(percent_complete + 1)
-        time.sleep(0.1)
+
+    if translate == "true":
+        df['Tweets_Translated'] = translateTweets(posts)
+        for percent_complete in range(7,14):
+            bar.progress(percent_complete + 1)
+            time.sleep(0.1)
     # Replace some NaN values, don't know why
     #df.Tweets_Translated.fillna(df.Tweet, inplace=True)
     df['id'] = pd.DataFrame([tweet.id for tweet in posts])
@@ -186,15 +198,28 @@ def createDF(posts):
         bar.progress(percent_complete + 1)
         time.sleep(0.1)
 
-    # Clean the tweets
-    df['clean_Tweet'] = df['Tweets_Translated'].apply(cleanTxt)
-    for percent_complete in range(63,70):
-        bar.progress(percent_complete + 1)
-        time.sleep(0.1)
-    df['clean_Tweet_original'] = df['Tweet'].apply(cleanTxt)
-    for percent_complete in range(70,77):
-        bar.progress(percent_complete + 1)
-        time.sleep(0.1)
+    if translate == "true":
+        # Clean the tweets
+        df['clean_Tweet'] = df['Tweets_Translated'].apply(cleanTxt)
+        for percent_complete in range(63,70):
+            bar.progress(percent_complete + 1)
+            time.sleep(0.1)
+        df['clean_Tweet_original'] = df['Tweet'].apply(cleanTxt)
+        for percent_complete in range(70,77):
+            bar.progress(percent_complete + 1)
+            time.sleep(0.1)
+    else: 
+        # Clean the tweets
+        df['clean_Tweet'] = df['Tweet'].apply(cleanTxt)
+        for percent_complete in range(63,70):
+            bar.progress(percent_complete + 1)
+            time.sleep(0.1)
+        df['clean_Tweet_original'] = df['Tweet'].apply(cleanTxt)
+        for percent_complete in range(70,77):
+            bar.progress(percent_complete + 1)
+            time.sleep(0.1)
+
+
     #df['Tweets_Translated'] = df['Tweets_Translated'].apply(cleanTxt)
     # Create two new columns 'Subjectivity' & 'Polarity'
     df['Subjectivity'] = df['clean_Tweet'].apply(getSubjectivity)
@@ -211,9 +236,8 @@ def createDF(posts):
         time.sleep(0.1) 
     time.sleep(1)
     bar.empty()
-    st.balloons()
     return df
-
+st.cache
 def sentimentPie(df):
     df1 = df.groupby('Analysis').count()[['Tweet']].reset_index()
     fig = px.pie(df1, 
@@ -228,7 +252,7 @@ def sentimentPie(df):
     fig.update_traces(textposition='inside', textinfo='percent+label')
     fig.update(layout_showlegend=False)
     st.plotly_chart(fig, use_container_width=True)
-
+st.cache
 def typePie(df):
     df1 = df.groupby('Type').count()[['Tweet']].reset_index()
 
@@ -245,7 +269,7 @@ def typePie(df):
     fig.update_traces(textposition='inside', textinfo='percent+label')
     fig.update(layout_showlegend=False)
     st.plotly_chart(fig, use_container_width=True)
-
+st.cache
 def sentimentScatter(df): 
     #Since plotly reads in html including tags, \n and the break tag <br> can be inserted into the text for the df variable you want to have wrap when displayed:
     df.Tweet = df.Tweet.str.wrap(60)
@@ -263,7 +287,7 @@ def sentimentScatter(df):
     fig.update_layout(template='plotly_white')
     #fig.update(layout_title_text='Sentiment Analysis')
     st.plotly_chart(fig, use_container_width=True)
-
+st.cache
 def generateWordCloud(df):
     # word cloud visualization
     allWords = ' '.join([twts for twts in df['clean_Tweet_original']])
@@ -274,9 +298,11 @@ def generateWordCloud(df):
     #ax.set_title('Most frequent words found')
     st.pyplot(fig, use_container_width=True)
 
+st.cache
 def getMask():
     return np.array(Image.open('img/twitter_mask.png'))
 
+st.cache
 def generate_better_wordcloud(df, title, mask=None):
     allWords = ' '.join([twts for twts in df['clean_Tweet_original']])
     cloud = WordCloud(scale=3,
@@ -308,7 +334,7 @@ class Tweet(object):
 
     def component(self):
         return components.html(self.text, height=600)
-
+st.cache
 def show_tweets(df, analysis, sort):
     newDF = df[df.Analysis == analysis]
     newDF = newDF.sort_values(by=['Polarity'], ascending=sort) #Sort the tweets
@@ -324,7 +350,7 @@ def show_tweets(df, analysis, sort):
         except:
             index +=1
         finished = evaluate_end_condition(count)
-
+st.cache
 def evaluate_end_condition(count):
     if count == 5:
         return True
@@ -343,7 +369,9 @@ def app():
     count = st.sidebar.slider('# of tweets', 10,3200,100)
     replies = st.sidebar.selectbox("Include replies", ("false", "true")) #you will receive up-to count tweets — this is because the count parameter retrieves that many Tweets before filtering out retweets and replies.
     rts = st.sidebar.selectbox("Include RTs", ("false", "true")) #When set to false , the timeline will strip any native retweets (though they will still count toward both the maximal length of the timeline and the slice selected by the count parameter).
-    #translate = st.sidebar.selectbox("Translate tweets", ("false", "true"))
+    st.sidebar.write("")
+    translate = st.sidebar.selectbox("Translate tweets", ("false", "true"))
+  
     submit = st.sidebar.button("Submit") 
 
     # Originally it is exclude_replies in Twitter API, so we need to invert it to be consistent with include_rts
@@ -352,11 +380,28 @@ def app():
     else: 
         replies= "false"
 
+    slot1 = st.empty()
+    slot2 = st.empty()
+    slot3 = st.empty()
+    slot4 = st.empty()
+    slot5 = st.empty()
+
+    slot1.write('In this page, we will be analyze tweets from a specific user.')
+    slot2.write('User timelines belonging to protected users may only be requested when the authenticated user either "owns" the timeline or is an approved follower of the owner.')
+    slot3.write("This method can only return up to 3,200 of a user's most recent Tweets. Native retweets of other statuses by the user is included in this total, regardless of whether `Include RTs` is set to false when requesting this resource.")
+    slot4.write('Using `Include replies` and `Include RTs` set to *false* with will mean you will receive up-to _# of tweets_ tweets — this is because the count parameter retrieves that many Tweets before filtering out retweets and replies.')
+    slot5.write('Use `Translate Tweets` set to true **ONLY** if you want to analyze users who tweet in another language. Translating tweets may take a little more time, sorry about that:(')
+
     if submit: 
         try:
             if full_username[0] != "@":
                 st.error("Please, don't forget the @")
             else:
+                slot1.empty()
+                slot2.empty()
+                slot3.empty()
+                slot4.empty()
+                slot5.empty()
                 username = full_username[1:]
                
                 # Extract tweets from the twitter user 
@@ -365,7 +410,7 @@ def app():
                     
                 st.header(f"Analyzing the Timeline of: **{full_username}** ...")
                 
-                df = createDF(posts)  
+                df = createDF(posts, translate)  
                 #st.dataframe(df)
                 #st.header("Rendering charts")
                 col1, col2 = st.columns([1,1])
@@ -395,10 +440,6 @@ def app():
 
         except:
             st.error()
-    else:
-        st.write('In this page, we will be analyze tweets from a specific user.')
-        st.write('User timelines belonging to protected users may only be requested when the authenticated user either "owns" the timeline or is an approved follower of the owner.')
-        st.write("This method can only return up to 3,200 of a user's most recent Tweets. Native retweets of other statuses by the user is included in this total, regardless of whether `Include RTs` is set to false when requesting this resource.")
-        st.write('Using `Include replies` and `Include RTs` set to *false* with will mean you will receive up-to _# of tweets_ tweets — this is because the count parameter retrieves that many Tweets before filtering out retweets and replies.')
+        
 
 
