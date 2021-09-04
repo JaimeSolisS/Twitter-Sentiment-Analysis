@@ -2,8 +2,6 @@ from numpy.core import machar
 import streamlit as st
 from tensorflow.python.ops.gen_array_ops import empty
 import tweepy
-import os
-from dotenv import load_dotenv
 import pandas as pd
 import re
 from textblob import TextBlob 
@@ -31,11 +29,10 @@ new_color_map = ListedColormap(color_map(np.linspace(0, .7, 256)))
 
 st.cache
 def auth(): 
-    load_dotenv()
-    apiKey = os.getenv('CONSUMER_KEY')
-    apiSecretKey= os.getenv('CONSUMER_SECRET')
-    accessToken= os.getenv('ACCESS_TOKEN')
-    AccessTokenSecret = os.getenv('ACCESS_TOKEN_SECRET')
+    apiKey = st.secrets['CONSUMER_KEY']
+    apiSecretKey= st.secrets['CONSUMER_SECRET']
+    accessToken= st.secrets['ACCESS_TOKEN']
+    AccessTokenSecret = st.secrets['ACCESS_TOKEN_SECRET']
 
     # create authentication object
     authenticate = tweepy.OAuthHandler(apiKey, apiSecretKey)
@@ -366,6 +363,7 @@ def app():
 
     st.sidebar.header('Specify Parameters')
     full_username = st.sidebar.text_input("Username (with @)")
+    error_slot = st.sidebar.empty() 
     count = st.sidebar.slider('# of tweets', 10,3200,100)
     replies = st.sidebar.selectbox("Include replies", ("false", "true")) #you will receive up-to count tweets — this is because the count parameter retrieves that many Tweets before filtering out retweets and replies.
     rts = st.sidebar.selectbox("Include RTs", ("false", "true")) #When set to false , the timeline will strip any native retweets (though they will still count toward both the maximal length of the timeline and the slice selected by the count parameter).
@@ -395,7 +393,7 @@ def app():
     if submit: 
         try:
             if full_username[0] != "@":
-                st.error("Please, don't forget the @")
+                error_slot.error("Please, don't forget the @")
             else:
                 slot1.empty()
                 slot2.empty()
@@ -406,40 +404,38 @@ def app():
                
                 # Extract tweets from the twitter user 
                 posts = []
-                getData(api,posts, username, replies, rts, count)
+                try:
+                    getData(api,posts, username, replies, rts, count)
+                        
+                    st.header(f"Analyzing the Timeline of: **{full_username}** ...")
                     
-                st.header(f"Analyzing the Timeline of: **{full_username}** ...")
-                
-                df = createDF(posts, translate)  
-                #st.dataframe(df)
-                #st.header("Rendering charts")
-                col1, col2 = st.columns([1,1])
-                with col1:
-                    st.subheader("Tweets Classification by Sentiment")
-                    sentimentPie(df)
-                    st.subheader("Sentiment Analysis")
-                    sentimentScatter(df)
-                    
-                with col2:
-                    st.subheader("Tweets Classification by Type")
-                    typePie(df)
-                    st.subheader("Most frequent Words")
-                    generate_better_wordcloud(df, "", mask=getMask())
+                    df = createDF(posts, translate)  
+                    #st.dataframe(df)
+                    #st.header("Rendering charts")
+                    col1, col2 = st.columns([1,1])
+                    with col1:
+                        st.subheader("Tweets Classification by Sentiment")
+                        sentimentPie(df)
+                        st.subheader("Sentiment Analysis")
+                        sentimentScatter(df)
+                        
+                    with col2:
+                        st.subheader("Tweets Classification by Type")
+                        typePie(df)
+                        st.subheader("Most frequent Words")
+                        generate_better_wordcloud(df, "", mask=getMask())
 
-                col1, col2 = st.columns([1,1])
-                with col1:
-                    st.subheader("Some Positive tweets")
-                    show_tweets(df, "Positive", False)
-                with col2:
-                   st.subheader("Some Negative tweets")
-                   show_tweets(df, "Negative", True)
-                
-                
-            
-                
-
+                    col1, col2 = st.columns([1,1])
+                    with col1:
+                        st.subheader("Some Positive tweets")
+                        show_tweets(df, "Positive", False)
+                    with col2:
+                        st.subheader("Some Negative tweets")
+                        show_tweets(df, "Negative", True)
+                except:
+                    st.error("Something went wrong 😞, maybe the tweets are protected or the user doesn't exist.")
         except:
-            st.error()
+            st.error("Something went wrong 😞")
         
 
 
