@@ -16,6 +16,8 @@ from PIL import Image
 import requests
 import streamlit.components.v1 as components
 from deep_translator import GoogleTranslator
+import time
+from stqdm import stqdm
 
 # Set Colors 
 blue = "#1DA1F2"
@@ -95,38 +97,121 @@ def translateTweet(text):
 # Create function to store translated tweets in a DataFrame
 def translateTweets(tweets): 
     translated_tweets =[]
+    
+    text = st.empty()
+    bar = st.empty()
+    
+    text.header("Translating tweets...")
+    bar.progress(0)
+    count = len(tweets)
+    
+    index = 0
     for tweet in tweets:
         translated_tweets.append(translateTweet((tweet.full_text)))
+        index += 1
+        bar.progress(((index*100)/count)/100)     
     df = pd.DataFrame(translated_tweets)
     df['Tweets_Translated'] = pd.Series(df.fillna('').values.tolist()).str.join('')
     df.drop(df.columns.difference(['Tweets_Translated']), 1, inplace=True)
+
+     # Clear screen
+    text.empty()
+    bar.empty()
     return df
 
 st.cache
+def getData(api, posts, username, replies, rts, count):
+    text = st.empty()
+    bar = st.empty()
+    text.header("Getting Data...")
+    bar.progress(0)
+    index = 0
+
+    # For 200 tweets or less
+    #posts = api.user_timeline(screen_name=username, count = count, exclude_replies=replies, include_rts=rts, tweet_mode="extended")
+
+    # For more than 200 tweets
+    for items in tweepy.Cursor(api.user_timeline, screen_name=username, exclude_replies=replies, include_rts=rts, tweet_mode="extended").items(count):
+        posts.append(items)
+        index += 1
+        bar.progress(((index*100)/count)/100)
+
+    # Clear screen
+    text.empty()
+    bar.empty()
+
+    return  
+    
+st.cache
 def createDF(posts): 
+    bar = st.empty()
+    bar.progress(0)
     # Create a dataframe with a column called Tweets
     df = pd.DataFrame([tweet.full_text for tweet in posts], columns=['Tweet'])
+    for percent_complete in range(7):
+        bar.progress(percent_complete + 1)
+        time.sleep(0.1)
     df['Tweets_Translated'] = translateTweets(posts)
+    for percent_complete in range(7,14):
+        bar.progress(percent_complete + 1)
+        time.sleep(0.1)
     # Replace some NaN values, don't know why
     #df.Tweets_Translated.fillna(df.Tweet, inplace=True)
     df['id'] = pd.DataFrame([tweet.id for tweet in posts])
+    for percent_complete in range(14,21):
+        bar.progress(percent_complete + 1)
+        time.sleep(0.1)
     df['screen_name'] = pd.DataFrame([tweet.user.screen_name for tweet in posts])
+    for percent_complete in range(21,28):
+        bar.progress(percent_complete + 1)
+        time.sleep(0.1)
     df['is_reply'] = pd.DataFrame([tweet.in_reply_to_screen_name for tweet in posts])
+    for percent_complete in range(28,35):
+        bar.progress(percent_complete + 1)
+        time.sleep(0.1)
     df['is_retweeted'] = df.apply(rt, axis=1)
+    for percent_complete in range(35,42):
+        bar.progress(percent_complete + 1)
+        time.sleep(0.1)
     df['is_quote'] = pd.DataFrame([tweet.is_quote_status for tweet in posts])
+    for percent_complete in range(42,49):
+        bar.progress(percent_complete + 1)
+        time.sleep(0.1)
     df['is_organic'] = df.apply(organic, axis=1)
+    for percent_complete in range(49,56):
+        bar.progress(percent_complete + 1)
+        time.sleep(0.1)
     df['Type'] =df.apply(tweetype, axis=1)
+    for percent_complete in range(56,63):
+        bar.progress(percent_complete + 1)
+        time.sleep(0.1)
 
     # Clean the tweets
     df['clean_Tweet'] = df['Tweets_Translated'].apply(cleanTxt)
+    for percent_complete in range(63,70):
+        bar.progress(percent_complete + 1)
+        time.sleep(0.1)
     df['clean_Tweet_original'] = df['Tweet'].apply(cleanTxt)
+    for percent_complete in range(70,77):
+        bar.progress(percent_complete + 1)
+        time.sleep(0.1)
     #df['Tweets_Translated'] = df['Tweets_Translated'].apply(cleanTxt)
     # Create two new columns 'Subjectivity' & 'Polarity'
     df['Subjectivity'] = df['clean_Tweet'].apply(getSubjectivity)
+    for percent_complete in range(77,84):
+        bar.progress(percent_complete + 1)
+        time.sleep(0.1)
     df['Polarity'] = df['clean_Tweet'].apply(getPolarity)
-
+    for percent_complete in range(84,91):
+        bar.progress(percent_complete + 1)
+        time.sleep(0.1)
     df['Analysis'] = df['Polarity'].apply(getAnalysis)
-    
+    for percent_complete in range(91,100):
+        bar.progress(percent_complete + 1)
+        time.sleep(0.1) 
+    time.sleep(1)
+    bar.empty()
+    st.balloons()
     return df
 
 def sentimentPie(df):
@@ -246,17 +331,20 @@ def evaluate_end_condition(count):
     else:
          return False
 
+
+          
+
+
 def app():
     api = auth()
-    st.title('By User')
-
 
     st.sidebar.header('Specify Parameters')
     full_username = st.sidebar.text_input("Username (with @)")
     count = st.sidebar.slider('# of tweets', 10,3200,100)
     replies = st.sidebar.selectbox("Include replies", ("false", "true")) #you will receive up-to count tweets — this is because the count parameter retrieves that many Tweets before filtering out retweets and replies.
-    rts = st.sidebar.selectbox("Include RTs", ("false", "true"))
-    submit = st.sidebar.button("Submit") #When set to false , the timeline will strip any native retweets (though they will still count toward both the maximal length of the timeline and the slice selected by the count parameter).
+    rts = st.sidebar.selectbox("Include RTs", ("false", "true")) #When set to false , the timeline will strip any native retweets (though they will still count toward both the maximal length of the timeline and the slice selected by the count parameter).
+    #translate = st.sidebar.selectbox("Translate tweets", ("false", "true"))
+    submit = st.sidebar.button("Submit") 
 
     # Originally it is exclude_replies in Twitter API, so we need to invert it to be consistent with include_rts
     if replies == "false":
@@ -270,19 +358,16 @@ def app():
                 st.error("Please, don't forget the @")
             else:
                 username = full_username[1:]
-                st.header(f"Analyzing the Timeline of: **{full_username}**")
+               
                 # Extract tweets from the twitter user 
                 posts = []
-                # For more than 200 tweets
-                for items in tweepy.Cursor(api.user_timeline, screen_name=username, exclude_replies=replies, include_rts=rts, tweet_mode="extended").items(count):
-                    posts.append(items)
-                # For 200 tweets or less
-                #posts = api.user_timeline(screen_name=username, count = count, exclude_replies=replies, include_rts=rts, tweet_mode="extended")
-
-                df = createDF(posts)  
-                st.dataframe(df)
-
+                getData(api,posts, username, replies, rts, count)
+                    
+                st.header(f"Analyzing the Timeline of: **{full_username}** ...")
                 
+                df = createDF(posts)  
+                #st.dataframe(df)
+                #st.header("Rendering charts")
                 col1, col2 = st.columns([1,1])
                 with col1:
                     st.subheader("Tweets Classification by Sentiment")
