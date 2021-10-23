@@ -141,7 +141,7 @@ def getData(api, posts, username, replies, rts, count):
     for items in tweepy.Cursor(api.user_timeline, screen_name=username, exclude_replies=replies, include_rts=rts, tweet_mode="extended").items(count):
         posts.append(items)
         index += 1
-        bar.progress(((index*100)/count)/100)
+        bar.progress(index/count)
 
     # Clear screen
     text.empty()
@@ -268,6 +268,7 @@ def typePie(df):
     st.plotly_chart(fig, use_container_width=True)
 st.cache
 def sentimentScatter(df): 
+    
     #Since plotly reads in html including tags, \n and the break tag <br> can be inserted into the text for the df variable you want to have wrap when displayed:
     df.Tweet = df.Tweet.str.wrap(60)
     df.Tweet = df.Tweet.apply(lambda x: x.replace('\n', '<br>'))
@@ -281,9 +282,22 @@ def sentimentScatter(df):
                 "Reply": light_gray,
                 },)
 
+    st.markdown("""
+    **Subjectivity**: how subjective or opinionated a tweet is (a score of 0 is fact, and a score of +1 is very much an opinion).  
+    **Polarity**: how positive or negative a tweet is (a score of -1 is the highest negative score, and a score of +1 is the highest positive score).
+    """)
     fig.update_layout(template='plotly_white')
     #fig.update(layout_title_text='Sentiment Analysis')
     st.plotly_chart(fig, use_container_width=True)
+
+    # get percentage
+    tweets = df[df.Analysis == 'Positive']
+    tweets = tweets['Tweet']
+    tweets = round( (tweets.shape[0] / df.shape[0]) * 100 , 1)
+    st.write(tweets)
+ 
+    
+    #st.dataframe(df)
 st.cache
 def generateWordCloud(df):
     # word cloud visualization
@@ -349,7 +363,7 @@ def show_tweets(df, analysis, sort):
         finished = evaluate_end_condition(count)
 st.cache
 def evaluate_end_condition(count):
-    if count == 5:
+    if count == 10:
         return True
     else:
          return False
@@ -392,7 +406,7 @@ def app():
     slot2.write('Requesting tweets from protected users or non-existent users will result in an error.')
     slot3.write("This method can only return up to 3,200 of a user's most recent Tweets. Native retweets of other statuses by the user is included in this total, regardless of whether `Include RTs` is set to false when requesting this resource.")
     slot4.write('Using `Include replies` and `Include RTs` set to *false* with will mean you will receive up-to _# of tweets_ tweets — this is because the count parameter retrieves that many Tweets before filtering out retweets and replies.')
-    slot5.write('Use `Translate Tweets` set to true **ONLY** if you want to analyze users who tweet in another language other than english. It is only possible to translate up to 300 tweets for now')
+    slot5.write('Use `Translate Tweets` set to true **ONLY** if you want to analyze users who tweet in another language other than english as it may take a bit to translate the tweets. It is only possible to translate up to 300 tweets for now.')
 
     if submit: 
         try:
@@ -416,18 +430,20 @@ def app():
                     df = createDF(posts, translate)  
                     #st.dataframe(df)
                     #st.header("Rendering charts")
+                    st.subheader("Polarity and Subjectivity")
+                    sentimentScatter(df)
+
                     col1, col2 = st.columns([1,1])
                     with col1:
                         st.subheader("Tweets Classification by Sentiment")
                         sentimentPie(df)
-                        st.subheader("Sentiment Analysis")
-                        sentimentScatter(df)
+                        
                         
                     with col2:
                         st.subheader("Tweets Classification by Type")
                         typePie(df)
-                        st.subheader("Most frequent Words")
-                        generate_better_wordcloud(df, "", mask=getMask())
+                    st.subheader("Most frequent Words")
+                    generate_better_wordcloud(df, "", mask=getMask())
 
                     col1, col2 = st.columns([1,1])
                     with col1:
