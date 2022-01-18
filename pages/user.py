@@ -1,6 +1,6 @@
 from numpy.core import machar
 import streamlit as st
-from tensorflow.python.ops.gen_array_ops import empty
+from tensorflow.python.ops.gen_array_ops import empty, placeholder
 import tweepy
 import pandas as pd
 import re
@@ -8,6 +8,7 @@ from textblob import TextBlob
 import plotly.express as px
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
+from wordcloud import STOPWORDS
 from matplotlib.colors import ListedColormap,LinearSegmentedColormap
 import numpy as np
 from PIL import Image
@@ -299,6 +300,7 @@ def sentimentScatter(df):
     
     #st.dataframe(df)
 st.cache
+
 def generateWordCloud(df):
     # word cloud visualization
     allWords = ' '.join([twts for twts in df['clean_Tweet_original']])
@@ -313,15 +315,26 @@ st.cache
 def getMask():
     return np.array(Image.open('img/twitter_mask.png'))
 
+def stopWords():
+    with open('stopwords/english.txt', 'r') as f:
+         #Define a list of stop words 
+        stopWords = [line.strip() for line in f]
+        return stopWords
+ 
 st.cache
-def generate_better_wordcloud(df, title, mask=None):
+def generate_better_wordcloud(df, title, use_custom_stop_words, mask=None):
+
     allWords = ' '.join([twts for twts in df['clean_Tweet_original']])
+    custom_stop_words_list = use_custom_stop_words.replace(" ", "").split(",")
+    stop_words = custom_stop_words_list + list(STOPWORDS)
+    
     cloud = WordCloud(scale=3,
-                        max_words=500,
-                        colormap=new_color_map,
-                        mask=mask,
-                        background_color='white',
-                        collocations=True).generate_from_text(allWords)
+            max_words=500,
+            colormap=new_color_map,
+            mask=mask,
+            background_color='white',
+            stopwords=stop_words,
+            collocations=True).generate_from_text(allWords)
 
     fig, ax = plt.subplots()                   
     ax.imshow(cloud, interpolation="bilinear")
@@ -383,11 +396,22 @@ def app():
     replies = st.sidebar.selectbox("Include replies", ("false", "true")) #you will receive up-to count tweets — this is because the count parameter retrieves that many Tweets before filtering out retweets and replies.
     rts = st.sidebar.selectbox("Include RTs", ("false", "true")) #When set to false , the timeline will strip any native retweets (though they will still count toward both the maximal length of the timeline and the slice selected by the count parameter).
     translate_slot = st.sidebar.empty()
-    if (count < 300):
-        translate = st.sidebar.selectbox("Translate tweets", ("false", "true"))
-    else: 
-        translate = "false"
-  
+    more_options = st.sidebar.checkbox('Show more options')
+    stop_words_slot = st.sidebar.empty()
+    custom_stop_words_slot = st.sidebar.empty()
+    
+    use_custom_stop_words = ""
+    translate = "false"
+    
+    if more_options:
+        use_custom_stop_words = custom_stop_words_slot.text_area('Custom stop words', value='', placeholder="e.g. words, world, youd, youre")
+        if (count < 300):
+            translate = st.sidebar.selectbox("Translate tweets", ("false", "true"))    
+    else:
+        stop_words_slot.empty()
+        custom_stop_words_slot.empty()
+ 
+
     submit = st.sidebar.button("Submit") 
 
     # Originally it is exclude_replies in Twitter API, so we need to invert it to be consistent with include_rts
@@ -401,12 +425,21 @@ def app():
     slot3 = st.empty()
     slot4 = st.empty()
     slot5 = st.empty()
+    slot6 = st.empty()
+    slot7 = st.empty()
+    slot8 = st.empty()
 
     slot1.write('In this page, we will analyze tweets from a specific user.')
     slot2.write('Requesting tweets from protected users or non-existent users will result in an error.')
     slot3.write("This method can only return up to 3,200 of a user's most recent Tweets. Native retweets of other statuses by the user is included in this total, regardless of whether `Include RTs` is set to false when requesting this resource.")
     slot4.write('Using `Include replies` and `Include RTs` set to *false* with will mean you will receive up-to _# of tweets_ tweets — this is because the count parameter retrieves that many Tweets before filtering out retweets and replies.')
-    slot5.write('Use `Translate Tweets` set to true **ONLY** if you want to analyze users who tweet in another language other than english as it may take a bit to translate the tweets. It is only possible to translate up to 300 tweets for now.')
+    slot5.write('Click the *Show more options* checkbox to display more configurations like *Custom Stop Words* or the *Translate tweets* options!')
+    slot6.write('To create the *word cloud* I used the built-in stop words list from the wordcloud library (you can see the whole list on its [repository](https://github.com/amueller/word_cloud/blob/master/wordcloud/stopwords)). But also by writting comma-separated words in the `Custom stop words` text area you can specify more words!')
+    slot7.write('''>  “*Stop words are **a set of commonly used words in a language**. 
+                        Examples of stop words in English are “a”, “the”, “is”, “are” and etc. 
+                    Stop words are commonly used in Text Mining and Natural Language Processing (NLP) 
+                    to eliminate words that are so commonly used that they carry very little useful information."— just googled that*. ''')
+    slot8.write('Use `Translate Tweets` set to true **ONLY** if you want to analyze users who tweet in another language other than english as it may take a bit to translate the tweets. It is only possible to translate up to 300 tweets for now.')
 
     if submit: 
         try:
@@ -443,7 +476,7 @@ def app():
                         st.subheader("Tweets Classification by Type")
                         typePie(df)
                     st.subheader("Most frequent Words")
-                    generate_better_wordcloud(df, "", mask=getMask())
+                    generate_better_wordcloud(df, "", use_custom_stop_words, mask=getMask())
 
                     col1, col2 = st.columns([1,1])
                     with col1:
