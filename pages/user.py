@@ -295,7 +295,7 @@ def sentimentScatter(df):
     tweets = df[df.Analysis == 'Positive']
     tweets = tweets['Tweet']
     tweets = round( (tweets.shape[0] / df.shape[0]) * 100 , 1)
-    st.write(tweets)
+    #st.write(tweets)
  
     
     #st.dataframe(df)
@@ -406,7 +406,7 @@ def app():
     
     if more_options:
         use_custom_stop_words = custom_stop_words_slot.text_area('Custom stop words', value='', placeholder="e.g. words, world, youd, youre")
-        tweets_toShow = tweets_toShow_slot.slider('# of sample tweets to show', 5,25,5, key="show")
+        tweets_toShow = tweets_toShow_slot.slider('# of sample tweets', 5,25,5, key="show")
         if (count < 300):
             translate = st.sidebar.selectbox("Translate tweets", ("false", "true"))    
     else:
