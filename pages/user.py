@@ -359,7 +359,7 @@ class Tweet(object):
     def component(self):
         return components.html(self.text, height=600)
 st.cache
-def show_tweets(df, analysis, sort):
+def show_tweets(df, analysis, sort, tweets_toShow):
     newDF = df[df.Analysis == analysis]
     newDF = newDF.sort_values(by=['Polarity'], ascending=sort) #Sort the tweets
     # Implment this in order to avoid errors
@@ -373,10 +373,10 @@ def show_tweets(df, analysis, sort):
             count += 1
         except:
             index +=1
-        finished = evaluate_end_condition(count)
+        finished = evaluate_end_condition(count, tweets_toShow)
 st.cache
-def evaluate_end_condition(count):
-    if count == 10:
+def evaluate_end_condition(count, tweets_toShow):
+    if count == tweets_toShow:
         return True
     else:
          return False
@@ -387,7 +387,7 @@ def app():
     st.sidebar.header('Specify Parameters')
     full_username = st.sidebar.text_input("Username (with @)")
     error_slot = st.sidebar.empty() 
-    count = st.sidebar.slider('# of tweets', 100,3200,100)
+    count = st.sidebar.slider('# of tweets', 100,3200,100, key="amount")
     count_slot = st.sidebar.empty()
     if count > 2000:
         count_slot.warning("This amount of tweets may take more than a mintue to process.")
@@ -399,17 +399,20 @@ def app():
     more_options = st.sidebar.checkbox('Show more options')
     stop_words_slot = st.sidebar.empty()
     custom_stop_words_slot = st.sidebar.empty()
+    tweets_toShow_slot = st.sidebar.empty()
     
     use_custom_stop_words = ""
     translate = "false"
     
     if more_options:
         use_custom_stop_words = custom_stop_words_slot.text_area('Custom stop words', value='', placeholder="e.g. words, world, youd, youre")
+        tweets_toShow = tweets_toShow_slot.slider('# of sample tweets to show', 5,25,5, key="show")
         if (count < 300):
             translate = st.sidebar.selectbox("Translate tweets", ("false", "true"))    
     else:
         stop_words_slot.empty()
         custom_stop_words_slot.empty()
+        tweets_toShow = 5
  
 
     submit = st.sidebar.button("Submit") 
@@ -451,6 +454,9 @@ def app():
                 slot3.empty()
                 slot4.empty()
                 slot5.empty()
+                slot6.empty()
+                slot7.empty()
+                slot8.empty()
                 username = full_username[1:]
                
                 # Extract tweets from the twitter user 
@@ -481,10 +487,10 @@ def app():
                     col1, col2 = st.columns([1,1])
                     with col1:
                         st.subheader("Some Positive tweets")
-                        show_tweets(df, "Positive", False)
+                        show_tweets(df, "Positive", False, tweets_toShow)
                     with col2:
                         st.subheader("Some Negative tweets")
-                        show_tweets(df, "Negative", True)
+                        show_tweets(df, "Negative", True, tweets_toShow)
                 except:
                     st.error("Something went wrong 😞")
         except:
