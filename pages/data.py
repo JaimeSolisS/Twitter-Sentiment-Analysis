@@ -2,7 +2,7 @@ import streamlit as st
 import tweepy
 
 st.cache
-def getData(api, posts, username, replies, rts, count):
+def getData_fromUser(api, posts, username, replies, rts, count):
     text = st.empty()
     bar = st.empty()
     text.header("Getting Data...")
@@ -23,3 +23,17 @@ def getData(api, posts, username, replies, rts, count):
     bar.empty()
 
     return  
+
+st.cache
+def getData_fromQuery(api,posts, query, count, lang, result_type):
+    text = st.empty()
+    bar = st.empty()
+    text.header("Getting Data...")
+    bar.progress(0)
+    index = 0
+    
+    #posts = api.search(q=query, count = count, lang=lang, tweet_mode="extended", result_type=result_type)
+
+    # Clear screen
+    text.empty()
+    bar.empty()

@@ -1,6 +1,6 @@
 import streamlit as st
 from pages.auth import auth
-from pages.data import getData
+from pages.data import getData_fromUser
 from pages.data_processing import createDF
 from pages.visuals import sentimentScatter, sentimentPie, getMask,generate_better_wordcloud, typePie, show_tweets
 
@@ -85,7 +85,7 @@ def app():
                 # Extract tweets from the twitter user 
                 posts = []
                 try:
-                    getData(api,posts, username, replies, rts, count)                 
+                    getData_fromUser(api,posts, username, replies, rts, count)                 
                         
                     st.header(f"Analyzing the Timeline of: **{full_username}** ...")
                     
